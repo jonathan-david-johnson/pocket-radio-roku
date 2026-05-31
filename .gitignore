@@ -1,0 +1,17 @@
+# Secrets — never commit
+SECRETS.local.md
+*.local.md
+.env
+.env.local
+*.env
+
+# Build artifacts
+channel.zip
+*.zip
+
+# Roku tmp / scratch
+tmp/
+out/
+
+# OS
+.DS_Store
