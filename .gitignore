@@ -1,6 +1,7 @@
 # Secrets — never commit
 SECRETS.local.md
 *.local.md
+source/secrets.brs
 .env
 .env.local
 *.env

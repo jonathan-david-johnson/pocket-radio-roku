@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- POSTs JSON to the pc-relay Supabase Edge Function and returns the JSON
+     response string. JSON is text, so GetString() is safe (unlike the binary
+     protobuf path that failed in Spike 1). -->
+<component name="RelayTask" extends="Task">
+  <interface>
+    <field id="bodyJson" type="string" />  <!-- full request JSON, includes "action" -->
+    <field id="response" type="string" />
+    <field id="status" type="int" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/tasks/RelayTask.brs" />
+  <script type="text/brightscript" uri="pkg:/source/secrets.brs" />
+</component>

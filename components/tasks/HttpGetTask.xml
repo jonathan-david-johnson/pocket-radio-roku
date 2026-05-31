@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Generic JSON HTTP GET on a Task thread (never the render thread). -->
+<component name="HttpGetTask" extends="Task">
+  <interface>
+    <field id="url" type="string" />
+    <field id="userAgent" type="string" value="PocketRadio/1.0" />
+    <!-- Output: raw response body string; observe this. -->
+    <field id="response" type="string" />
+    <field id="status" type="int" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/tasks/HttpGetTask.brs" />
+</component>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Spike 1: binary byte-fidelity over roUrlTransfer.
+     The pivotal question: since Roku has no AsyncPostToFile, a binary POST
+     response can only be read via roUrlEvent.GetString(). Does that path
+     preserve bytes >= 0x80, or must we build a JSON<->protobuf relay? -->
+<component name="Spike1Task" extends="Task">
+  <interface>
+    <field id="report" type="string" />   <!-- multiline PASS/FAIL summary -->
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/tasks/Spike1Task.brs" />
+</component>
