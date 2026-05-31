@@ -3,13 +3,13 @@
   <interface />
   <children>
     <Label id="title"
-           text="PocketStreams — Relay E2E"
+           text="PocketStreams — M1"
            translation="[80, 80]"
            width="1760"
            font="font:LargeBoldSystemFont"
            color="0xFFFFFFFF" />
     <Label id="status"
-           text="Fetching radio-browser topvote..."
+           text="Loading..."
            translation="[80, 180]"
            width="1760"
            height="800"
@@ -18,5 +18,4 @@
            color="0xCCDDEEFF" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
-  <script type="text/brightscript" uri="pkg:/source/secrets.brs" />
 </component>
