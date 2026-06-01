@@ -48,8 +48,8 @@ Sub onDataChanged()
             m.progressFill.width = 0
             m.timeLabel.text = NpFmt(posVal)
         end if
-        m.skipHint.text  = "<<  Skip Back 10s      Skip Fwd 45s  >>"
-        m.bottomHint.text = "Play/Pause  (Play btn)   |   Skip  (Left / Right)   |   Back  (Back)"
+        m.skipHint.text  = "<<  Back " + CInt(m.top.skipBack).ToStr() + "s      Fwd " + CInt(m.top.skipFwd).ToStr() + "s  >>"
+        m.bottomHint.text = "Play/Pause  (Play btn)   |   Skip  (Left / Right / FF / REW)   |   Back  (Back)"
     end if
 End Sub
 

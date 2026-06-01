@@ -8,6 +8,8 @@
     <field id="duration"    type="integer" onChange="onDataChanged" />
     <field id="isLive"      type="boolean" value="false" onChange="onDataChanged" />
     <field id="playState"   type="string"  onChange="onDataChanged" />
+    <field id="skipBack"    type="integer" value="10"  onChange="onDataChanged" />
+    <field id="skipFwd"     type="integer" value="45"  onChange="onDataChanged" />
   </interface>
   <children>
     <!-- full-screen background -->

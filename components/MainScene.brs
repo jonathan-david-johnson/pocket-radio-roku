@@ -127,8 +127,33 @@ End Sub
 Sub showMain(auth as object)
     m.mode = "main"
     m.auth = auth
+    m.skipBack = 10
+    m.skipFwd  = 45
     m.top.setFocus(true)
+    loadSkipSettings()
     showUpNext()
+End Sub
+
+Sub loadSkipSettings()
+    m.settingsTask = CreateObject("roSGNode", "RelayTask")
+    m.settingsTask.observeField("response", "onSkipSettingsLoaded")
+    m.settingsTask.bodyJson = FormatJSON({ action: "namedSettings", token: m.auth.token })
+    m.settingsTask.control = "RUN"
+End Sub
+
+Sub onSkipSettingsLoaded()
+    if m.settingsTask.status <> 200 then return
+    data = ParseJSON(m.settingsTask.response)
+    if data = invalid then return
+    if data.skipBack <> invalid and data.skipBack > 0
+        m.skipBack = CInt(data.skipBack)
+    end if
+    if data.skipForward <> invalid and data.skipForward > 0
+        m.skipFwd = CInt(data.skipForward)
+    end if
+    m.nowPlaying.skipBack = m.skipBack
+    m.nowPlaying.skipFwd  = m.skipFwd
+    print "[MainScene] skip settings back="; m.skipBack; " fwd="; m.skipFwd
 End Sub
 
 Sub showFavorites()
@@ -377,7 +402,9 @@ Sub onStationSelected()
     m.currentEpisode = invalid
     isLive = (fmt <> "mp3")
     m.isCurrentlyLive = isLive
+    stopTracklist()
     showNowPlaying(item.title, "", item.HDPosterUrl, isLive)
+    startTracklist(item.title)
 End Sub
 
 Function inferStreamformat(url as string, codec as string) as string
@@ -422,8 +449,12 @@ Sub loadUpNext()
 End Sub
 
 Sub onUpNextLoaded()
+    if m.relay.status = 401 or m.relay.status = 403
+        logout()
+        return
+    end if
     if m.relay.status <> 200
-        m.status.text = "Failed to load Up Next."
+        m.status.text = "Failed to load Up Next. Check network."
         return
     end if
     data = ParseJSON(m.relay.response)
@@ -489,8 +520,12 @@ End Sub
 
 Sub onNewReleasesLoaded()
     print "[MainScene] onNewReleasesLoaded status="; m.relay.status
+    if m.relay.status = 401 or m.relay.status = 403
+        logout()
+        return
+    end if
     if m.relay.status <> 200
-        m.status.text = "Failed to load New Releases."
+        m.status.text = "Failed to load New Releases. Check network."
         return
     end if
     data = ParseJSON(m.relay.response)
@@ -592,10 +627,11 @@ Sub playEpisode(item)
     m.audio.control = "play"
 
     m.isCurrentlyLive = false
+    stopTracklist()
     m.status.text = "Playing: " + item.title
     podcastName = ""
     if meta.podcastName <> invalid then podcastName = meta.podcastName
-    artworkUrl = "https://static.pocketcasts.com/discover/images/130/" + meta.podcast + ".jpg"
+    artworkUrl = "https://static.pocketcasts.com/discover/images/420/" + meta.podcast + ".jpg"
     m.currentEpisode = {
         uuid: meta.uuid,
         podcast: meta.podcast,
@@ -627,6 +663,8 @@ Sub showNowPlaying(title as string, podcastName as string, artworkUrl as string,
     if m.currentEpisode <> invalid
         m.nowPlaying.duration = m.currentEpisode.duration
     end if
+    m.nowPlaying.skipBack  = m.skipBack
+    m.nowPlaying.skipFwd   = m.skipFwd
     m.nowPlaying.playState = "playing"
     m.nowPlaying.visible   = true
     m.nowPlaying.setFocus(true)
@@ -800,13 +838,19 @@ Sub onAudioState()
         if m.currentEpisode <> invalid
             saveEpisodePosition(m.audio.position, 2)
         end if
-        if m.saveTimer <> invalid
-            m.saveTimer.control = "stop"
-        end if
+        if m.saveTimer <> invalid then m.saveTimer.control = "stop"
+        stopTracklist()
     else if m.audio.state = "playing"
         if m.currentEpisode <> invalid and m.saveTimer <> invalid
             m.saveTimer.control = "start"
         end if
+    else if m.audio.state = "error"
+        stopTracklist()
+        if m.saveTimer <> invalid then m.saveTimer.control = "stop"
+        if m.posTimer  <> invalid then m.posTimer.control  = "stop"
+        if m.nowPlaying.visible then hideNowPlaying()
+        m.status.text = "Playback error. Check network and try again."
+        print "[MainScene] audio error"
     end if
 End Sub
 
@@ -885,6 +929,85 @@ Sub onFavoriteRemoved()
     end if
 End Sub
 
+' ---- tracklist -------------------------------------------------------------
+
+Sub startTracklist(stationName as string)
+    stopTracklist()
+    nameLow = LCase(stationName)
+    trackType = ""
+    if nameLow.Instr(0, "kcrw") >= 0 then trackType = "kcrw"
+    if nameLow.Instr(0, "kexp") >= 0 then trackType = "kexp"
+    if trackType = "" then return
+    m.tracklistType = trackType
+    fetchTracklist()
+    m.tracklistTimer = m.top.createChild("Timer")
+    m.tracklistTimer.duration = 30
+    m.tracklistTimer.repeat   = true
+    m.tracklistTimer.observeField("fire", "onTracklistTimer")
+    m.tracklistTimer.control = "start"
+End Sub
+
+Sub stopTracklist()
+    if m.tracklistTimer <> invalid
+        m.tracklistTimer.control = "stop"
+        m.tracklistTimer = invalid
+    end if
+    m.tracklistType = ""
+End Sub
+
+Sub onTracklistTimer()
+    fetchTracklist()
+End Sub
+
+Sub fetchTracklist()
+    if m.tracklistType = "kcrw"
+        m.trackHttp = CreateObject("roSGNode", "HttpJsonTask")
+        m.trackHttp.observeField("response", "onTracklistLoaded")
+        m.trackHttp.url = "https://tracklist-api.kcrw.com/Music/all/1?page_size=10"
+        m.trackHttp.control = "RUN"
+    else if m.tracklistType = "kexp"
+        m.trackHttp = CreateObject("roSGNode", "HttpJsonTask")
+        m.trackHttp.observeField("response", "onTracklistLoaded")
+        m.trackHttp.url = "https://api.kexp.org/v2/plays/?limit=10"
+        m.trackHttp.control = "RUN"
+    end if
+End Sub
+
+Sub onTracklistLoaded()
+    if m.trackHttp.status <> 200 then return
+    data = ParseJSON(m.trackHttp.response)
+    if data = invalid then return
+    trackText = ""
+    if m.tracklistType = "kcrw"
+        if type(data) = "roArray" and data.count() > 0
+            for each entry in data
+                artist = entry.artist
+                title  = entry.title
+                if artist <> invalid and artist <> "" and artist <> "[BREAK]" and title <> invalid and title <> ""
+                    trackText = title + " -- " + artist
+                    exit for
+                end if
+            end for
+        end if
+    else if m.tracklistType = "kexp"
+        results = data.results
+        if results <> invalid and results.count() > 0
+            for each entry in results
+                if entry.play_type = "trackplay" and entry.song <> invalid and entry.song <> ""
+                    artist = entry.artist
+                    if artist = invalid then artist = ""
+                    trackText = entry.song
+                    if artist <> "" then trackText = trackText + " -- " + artist
+                    exit for
+                end if
+            end for
+        end if
+    end if
+    if trackText <> "" and m.nowPlaying.visible
+        m.nowPlaying.podcastName = trackText
+    end if
+End Sub
+
 ' ---- detail screens --------------------------------------------------------
 
 Sub showEpisodeDetail()
@@ -903,7 +1026,7 @@ Sub showEpisodeDetail()
     m.detailScreen.heading    = "EPISODE DETAIL"
     m.detailScreen.titleText  = item.title
     m.detailScreen.subtitle   = meta.podcastName
-    m.detailScreen.artworkUrl = "https://static.pocketcasts.com/discover/images/130/" + meta.podcast + ".jpg"
+    m.detailScreen.artworkUrl = "https://static.pocketcasts.com/discover/images/420/" + meta.podcast + ".jpg"
     m.detailScreen.bodyText   = "Loading show notes..."
     m.detailScreen.hintText   = "Back  (Back btn)   |   Right  Detail"
     m.detailScreen.visible    = true
@@ -1061,8 +1184,10 @@ End Sub
 Sub logout()
     if m.audio <> invalid then m.audio.control = "stop"
     if m.saveTimer <> invalid then m.saveTimer.control = "stop"
-    if m.posTimer <> invalid then m.posTimer.control = "stop"
-    m.nowPlaying.visible = false
+    if m.posTimer  <> invalid then m.posTimer.control  = "stop"
+    stopTracklist()
+    m.nowPlaying.visible    = false
+    m.detailScreen.visible  = false
     m.currentEpisode = invalid
     AuthClear()
     m.auth = invalid
@@ -1095,16 +1220,16 @@ Function onKeyEvent(key as string, press as boolean) as boolean
                 end if
             end if
             return true
-        else if key = "left"
+        else if key = "left" or key = "rewind"
             if m.audio <> invalid and not m.isCurrentlyLive
-                seekPos = m.audio.getField("position") - 10
+                seekPos = m.audio.getField("position") - m.skipBack
                 if seekPos < 0 then seekPos = 0
                 m.audio.seek = seekPos
             end if
             return true
-        else if key = "right"
+        else if key = "right" or key = "fastforward"
             if m.audio <> invalid and not m.isCurrentlyLive
-                m.audio.seek = m.audio.getField("position") + 45
+                m.audio.seek = m.audio.getField("position") + m.skipFwd
             end if
             return true
         end if
