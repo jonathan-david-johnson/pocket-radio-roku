@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="TileItem" extends="Group">
+  <interface>
+    <field id="itemContent"  type="node"    onChange="onContentSet" />
+    <field id="focusPercent" type="float"   onChange="onFocus" />
+    <field id="isNowPlaying" type="boolean" value="false" onChange="onNowPlayingChanged" />
+  </interface>
+  <children>
+    <!-- Focus border sits behind bg; 2px border via 274x204 rect offset -2,-2 -->
+    <Rectangle id="focusBorder" width="274" height="204" translation="[-2,-2]"
+               color="0x00A0E8FF" visible="false" />
+    <Rectangle id="bg" width="270" height="200" color="0x1A1B1DFF" />
+    <Poster id="art" width="270" height="150" translation="[0,0]"
+            loadDisplayMode="scaleToZoom" />
+    <!-- NOW badge: top-right of artwork -->
+    <Rectangle id="nowBg" width="52" height="22" translation="[216,4]"
+               color="0x00A0E8FF" visible="false" />
+    <Label id="nowLabel" translation="[216,4]" width="52" height="22"
+           font="font:SmallestSystemFont" color="0x000000FF"
+           horizAlign="center" vertAlign="center"
+           text="NOW" visible="false" />
+    <Label id="titleLabel" translation="[8,155]" width="254" height="26"
+           font="font:SmallSystemFont" color="0xFFFFFFFF"
+           truncateOnDelimiter="true" />
+    <Label id="metaLabel" translation="[8,178]" width="254" height="22"
+           font="font:SmallestSystemFont" color="0x9C9FA4FF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/TileItem.brs" />
+</component>
