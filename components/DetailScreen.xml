@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="DetailScreen" extends="Group">
+  <interface>
+    <field id="heading"    type="string" onChange="onDataChanged" />
+    <field id="titleText"  type="string" onChange="onDataChanged" />
+    <field id="subtitle"   type="string" onChange="onDataChanged" />
+    <field id="bodyText"   type="string" onChange="onDataChanged" />
+    <field id="hintText"   type="string" onChange="onDataChanged" />
+    <field id="artworkUrl" type="string" onChange="onArtworkChanged" />
+  </interface>
+  <children>
+    <Rectangle id="bg"       width="1920" height="1080" translation="[0,0]"  color="0x0D0E10FF" />
+    <Rectangle id="headerBg" width="1920" height="120"  translation="[0,0]"  color="0x1E2124FF" />
+    <Label id="heading"
+           translation="[80, 60]"
+           font="font:MediumBoldSystemFont"
+           vertAlign="center"
+           color="0x9C9FA4FF" />
+
+    <Poster id="artwork"
+            width="380" height="380"
+            translation="[80, 160]"
+            loadDisplayMode="scaleToFit" />
+
+    <Label id="titleLabel"
+           translation="[540, 160]"
+           width="1320" height="120"
+           font="font:LargeBoldSystemFont"
+           color="0xFFFFFFFF"
+           wrap="true" />
+    <Label id="subtitleLabel"
+           translation="[540, 310]"
+           width="1320"
+           font="font:MediumSystemFont"
+           color="0x9C9FA4FF" />
+    <Label id="bodyLabel"
+           translation="[540, 380]"
+           width="1320" height="560"
+           font="font:SmallSystemFont"
+           color="0xCCCECFFF"
+           wrap="true" />
+
+    <Label id="hintLabel"
+           translation="[80, 1020]"
+           width="1760"
+           font="font:SmallSystemFont"
+           color="0x4A4D54FF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/DetailScreen.brs" />
+</component>

@@ -5,7 +5,8 @@ Sub init()
     m.stationList.observeField("itemSelected", "onStationSelected")
     m.upNextList = m.top.findNode("upNextList")
     m.upNextList.observeField("itemSelected", "onEpisodeSelected")
-    m.nowPlaying = m.top.findNode("nowPlaying")
+    m.nowPlaying  = m.top.findNode("nowPlaying")
+    m.detailScreen = m.top.findNode("detailScreen")
     m.mode = "boot"
     m.top.setFocus(true)
 
@@ -462,6 +463,69 @@ Sub showUpNextList(episodes as object)
     end if
 End Sub
 
+' ---- new releases ---------------------------------------------------------
+
+Sub showNewReleases()
+    print "[MainScene] showNewReleases"
+    m.mode = "new_releases"
+    m.title.text = "PocketStreams — New Releases"
+    m.status.text = "Loading..."
+    m.stationList.visible = false
+    m.upNextList.visible = true
+    list = m.upNextList.findNode("list")
+    if list <> invalid then list.setFocus(true)
+    loadNewReleases()
+End Sub
+
+Sub loadNewReleases()
+    m.relay = CreateObject("roSGNode", "RelayTask")
+    m.relay.observeField("response", "onNewReleasesLoaded")
+    m.relay.bodyJson = FormatJSON({
+        action: "newReleases",
+        token: m.auth.token
+    })
+    m.relay.control = "RUN"
+End Sub
+
+Sub onNewReleasesLoaded()
+    print "[MainScene] onNewReleasesLoaded status="; m.relay.status
+    if m.relay.status <> 200
+        m.status.text = "Failed to load New Releases."
+        return
+    end if
+    data = ParseJSON(m.relay.response)
+    if data = invalid or data.episodes = invalid or data.episodes.count() = 0
+        m.status.text = "No new episodes in the last 14 days."
+        return
+    end if
+    content = createObject("roSGNode", "ContentNode")
+    for each ep in data.episodes
+        child = content.createChild("ContentNode")
+        child.title = ep.title
+        child.url = ep.url
+        meta = {
+            uuid: ep.uuid,
+            podcast: ep.podcast,
+            podcastName: ep.podcastName,
+            playedUpTo: 0,
+            duration: ep.duration,
+            published: ep.published
+        }
+        child.description = FormatJSON(meta)
+        artPodcast = ep.podcast
+        if ep.artworkUrl <> invalid and ep.artworkUrl <> ""
+            child.HDPosterUrl = ep.artworkUrl
+        end if
+    end for
+    list = m.upNextList.findNode("list")
+    if list <> invalid
+        list.content = content
+        list.jumpToItem = 0
+        list.setFocus(true)
+    end if
+    m.status.text = data.episodes.count().ToStr() + " new episodes"
+End Sub
+
 Sub onEpisodeSelected()
     index = m.upNextList.itemSelected
     list = m.upNextList.findNode("list")
@@ -471,17 +535,35 @@ Sub onEpisodeSelected()
     item = content.getChild(index)
     if item = invalid then return
 
-    meta = ParseJSON(item.description)
-    if meta <> invalid
-        playNowUpNext({
+    if index = 0 and m.mode = "up_next"
+        playEpisode(item)
+    else
+        meta = ParseJSON(item.description)
+        if meta = invalid then return
+        m.pendingPlayItem = item
+        m.status.text = "Moving to top..."
+        m.changeTask = CreateObject("roSGNode", "RelayTask")
+        m.changeTask.observeField("response", "onPlayNowDone")
+        m.changeTask.bodyJson = FormatJSON({
+            action: "upNextChange",
+            token: m.auth.token,
+            change: "playNow",
+            deviceId: m.deviceId,
             uuid: meta.uuid,
             title: item.title,
             url: item.url,
             podcast: meta.podcast
         })
+        m.changeTask.control = "RUN"
     end if
+End Sub
 
-    playEpisode(item)
+Sub onPlayNowDone()
+    print "[MainScene] playNow done status="; m.changeTask.status
+    if m.pendingPlayItem <> invalid
+        playEpisode(m.pendingPlayItem)
+        m.pendingPlayItem = invalid
+    end if
 End Sub
 
 Sub playEpisode(item)
@@ -642,20 +724,25 @@ Sub removeFromUpNext(episode)
     m.changeTask.control = "RUN"
 End Sub
 
-Sub playNowUpNext(episode)
-    m.changeTask = CreateObject("roSGNode", "RelayTask")
-    m.changeTask.observeField("response", "onChangeDone")
-    m.changeTask.bodyJson = FormatJSON({
-        action: "upNextChange",
+Sub finishAndAdvance(episode)
+    m.finishTask = CreateObject("roSGNode", "RelayTask")
+    m.finishTask.observeField("response", "onFinishDone")
+    m.finishTask.bodyJson = FormatJSON({
+        action: "finishEpisode",
         token: m.auth.token,
-        change: "playNow",
-        deviceId: m.deviceId,
         uuid: episode.uuid,
+        podcast: episode.podcast,
         title: episode.title,
         url: episode.url,
-        podcast: episode.podcast
+        duration: episode.duration,
+        deviceId: m.deviceId
     })
-    m.changeTask.control = "RUN"
+    m.finishTask.control = "RUN"
+End Sub
+
+Sub onFinishDone()
+    print "[MainScene] finishEpisode done status="; m.finishTask.status
+    advanceQueue()
 End Sub
 
 Sub onChangeDone()
@@ -704,9 +791,8 @@ Sub onAudioState()
 
     if m.audio.state = "finished"
         if m.currentEpisode <> invalid
-            saveEpisodePosition(m.currentEpisode.duration, 3)
-            removeFromUpNext(m.currentEpisode)
-            advanceQueue()
+            if m.saveTimer <> invalid then m.saveTimer.control = "stop"
+            finishAndAdvance(m.currentEpisode)
         else if m.currentStation <> invalid
             m.status.text = "Stream ended."
         end if
@@ -799,13 +885,142 @@ Sub onFavoriteRemoved()
     end if
 End Sub
 
+' ---- detail screens --------------------------------------------------------
+
+Sub showEpisodeDetail()
+    mode = m.mode
+    list = m.upNextList.findNode("list")
+    if list = invalid then return
+    focusIdx = m.upNextList.itemFocused
+    if focusIdx < 0 then focusIdx = 0
+    item = list.content.getChild(focusIdx)
+    if item = invalid then return
+    meta = ParseJSON(item.description)
+    if meta = invalid then return
+
+    m.detailStationId = ""
+    m.detailPrevMode  = mode
+    m.detailScreen.heading    = "EPISODE DETAIL"
+    m.detailScreen.titleText  = item.title
+    m.detailScreen.subtitle   = meta.podcastName
+    m.detailScreen.artworkUrl = "https://static.pocketcasts.com/discover/images/130/" + meta.podcast + ".jpg"
+    m.detailScreen.bodyText   = "Loading show notes..."
+    m.detailScreen.hintText   = "Back  (Back btn)   |   Right  Detail"
+    m.detailScreen.visible    = true
+    m.mode = "detail"
+
+    m.showNotesTask = CreateObject("roSGNode", "HttpJsonTask")
+    m.showNotesTask.observeField("response", "onShowNotesLoaded")
+    m.showNotesTask.url = "https://cache.pocketcasts.com/mobile/show_notes/full/" + meta.podcast
+    m.showNotesTask.control = "RUN"
+    m.pendingShowNotesUuid = meta.uuid
+End Sub
+
+Sub onShowNotesLoaded()
+    if m.showNotesTask.status <> 200
+        m.detailScreen.bodyText = "Could not load show notes."
+        return
+    end if
+    data = ParseJSON(m.showNotesTask.response)
+    if data = invalid then
+        m.detailScreen.bodyText = "Could not parse show notes."
+        return
+    end if
+    episodes = data.podcast.episodes
+    notes = ""
+    for each ep in episodes
+        if ep.uuid = m.pendingShowNotesUuid
+            if ep.show_notes <> invalid then notes = ep.show_notes
+        end if
+    end for
+    if notes = ""
+        m.detailScreen.bodyText = "(No show notes available.)"
+        return
+    end if
+    m.detailScreen.bodyText = StripHtml(notes)
+End Sub
+
+Function StripHtml(txt as string) as string
+    result = CreateObject("roRegex", "<[^>]*>", "i").ReplaceAll(txt, "")
+    result = result.Replace("&amp;", "&")
+    result = result.Replace("&lt;", "<")
+    result = result.Replace("&gt;", ">")
+    result = result.Replace("&quot;", Chr(34))
+    result = result.Replace("&#39;", "'")
+    result = result.Replace("&nbsp;", " ")
+    result = result.Replace("&hellip;", "...")
+    result = result.Replace("&#8230;", "...")
+    result = result.Replace("&#8216;", "'")
+    result = result.Replace("&#8217;", "'")
+    result = result.Replace("&#8220;", Chr(34))
+    result = result.Replace("&#8221;", Chr(34))
+    result = CreateObject("roRegex", "\n\n+", "").ReplaceAll(result, Chr(10))
+    return result.Trim()
+End Function
+
+Sub showStationDetail()
+    list = m.stationList.findNode("list")
+    if list = invalid then return
+    focusIdx = m.stationList.itemFocused
+    if focusIdx < 0 then focusIdx = 0
+    item = list.content.getChild(focusIdx)
+    if item = invalid then return
+    meta = ParseJSON(item.description)
+    if meta = invalid then return
+
+    stationId = ""
+    if meta.stationuuid <> invalid then stationId = meta.stationuuid
+
+    bodyLines = []
+    if meta.display <> invalid and meta.display <> ""
+        bodyLines.push("Country:  " + meta.display)
+    end if
+    if meta.codec <> invalid and meta.codec <> ""
+        codecStr = meta.codec
+        if meta.bitrate <> invalid and meta.bitrate > 0
+            codecStr = codecStr + " / " + meta.bitrate.ToStr() + " kbps"
+        end if
+        bodyLines.push("Format:   " + codecStr)
+    end if
+
+    isFav = (m.mode = "favorites")
+    favHint = "  |   Left  Add Favorite"
+    if isFav then favHint = "  |   Left  Remove Favorite"
+
+    m.detailStationId = stationId
+    m.detailIsFav     = isFav
+    m.detailPrevMode  = m.mode
+    m.detailScreen.heading    = "STATION DETAIL"
+    m.detailScreen.titleText  = item.title
+    m.detailScreen.subtitle   = ""
+    m.detailScreen.artworkUrl = item.HDPosterUrl
+    m.detailScreen.bodyText   = bodyLines.Join(Chr(10))
+    m.detailScreen.hintText   = "Back  (Back)" + favHint
+    m.detailScreen.visible    = true
+    m.mode = "detail"
+End Sub
+
+Sub hideDetail()
+    m.detailScreen.visible = false
+    prevMode = m.detailPrevMode
+    if prevMode = "up_next" or prevMode = "new_releases"
+        m.mode = prevMode
+        list = m.upNextList.findNode("list")
+        if list <> invalid then list.setFocus(true)
+    else
+        m.mode = prevMode
+        list = m.stationList.findNode("list")
+        if list <> invalid then list.setFocus(true)
+    end if
+End Sub
+
 ' ---- menu ------------------------------------------------------------------
 
 Sub showMenu()
     m.mode = "menu"
     dlg = CreateObject("roSGNode", "Dialog")
     dlg.title = "Menu"
-    dlg.buttons = ["Up Next", "Radio Favorites", "Browse Stations", "Search Stations", "Log Out"]
+    dlg.buttons = ["Up Next", "New Releases", "Radio Favorites", "Browse Stations", "Search Stations", "Log Out"]
     m.dlg = dlg
     dlg.observeField("buttonSelected", "onMenuBtn")
     dlg.observeField("wasClosed", "onMenuClosed")
@@ -818,12 +1033,14 @@ Sub onMenuBtn()
     if btn = 0
         showUpNext()
     else if btn = 1
-        showFavorites()
+        showNewReleases()
     else if btn = 2
-        showBrowse()
+        showFavorites()
     else if btn = 3
-        showSearch()
+        showBrowse()
     else if btn = 4
+        showSearch()
+    else if btn = 5
         logout()
     end if
 End Sub
@@ -835,6 +1052,7 @@ Sub onMenuClosed()
         m.upNextList.visible = true
         list = m.upNextList.findNode("list")
         if list <> invalid then list.setFocus(true)
+        loadUpNext()
     end if
 End Sub
 
@@ -892,9 +1110,29 @@ Function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return false
     end if
-    if m.mode = "up_next"
+    if m.mode = "detail"
+        if key = "back"
+            hideDetail()
+            return true
+        else if key = "left"
+            if m.detailStationId <> "" and m.detailStationId <> invalid
+                if m.detailIsFav
+                    removeFavorite(m.detailStationId)
+                else
+                    addFavorite(m.detailStationId)
+                end if
+                hideDetail()
+            end if
+            return true
+        end if
+        return false
+    end if
+    if m.mode = "up_next" or m.mode = "new_releases"
         if key = "back"
             showMenu()
+            return true
+        else if key = "right"
+            showEpisodeDetail()
             return true
         else if key = "play"
             if m.audio <> invalid
@@ -915,8 +1153,8 @@ Function onKeyEvent(key as string, press as boolean) as boolean
                 showFavorites()
                 return true
             end if
-        else if key = "options"
-            toggleFavorite()
+        else if key = "right"
+            showStationDetail()
             return true
         else if key = "play"
             if m.audio <> invalid

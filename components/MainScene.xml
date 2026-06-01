@@ -30,6 +30,7 @@
     <UpNextList id="upNextList" visible="false" />
     <StationList id="stationList" visible="false" />
     <NowPlaying id="nowPlaying" visible="false" />
+    <DetailScreen id="detailScreen" visible="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
   <script type="text/brightscript" uri="pkg:/source/registry.brs" />
