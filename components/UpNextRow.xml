@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="UpNextRow" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContentSet" />
+    <field id="focusPercent" type="float" onChange="onFocus" />
+  </interface>
+  <children>
+    <Rectangle id="bg" width="1760" height="80" color="0x292B2EFF" />
+    <Label id="title"
+           translation="[20, 8]"
+           width="1300" height="36"
+           font="font:LargeSystemFont"
+           color="0xFFFFFFFF" />
+    <Label id="podcast"
+           translation="[20, 44]"
+           width="1300" height="28"
+           font="font:SmallSystemFont"
+           color="0x9C9FA4FF" />
+    <Label id="progress"
+           translation="[1340, 24]"
+           width="400" height="32"
+           font="font:SmallSystemFont"
+           color="0x9C9FA4FF"
+           horizAlign="right" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/UpNextRow.brs" />
+</component>

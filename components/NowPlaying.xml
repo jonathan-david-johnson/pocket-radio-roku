@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="NowPlaying" extends="Group">
+  <interface>
+    <field id="trackTitle"  type="string"  onChange="onDataChanged" />
+    <field id="podcastName" type="string"  onChange="onDataChanged" />
+    <field id="artworkUrl"  type="string"  onChange="onArtworkChanged" />
+    <field id="playPos"     type="float"   onChange="onDataChanged" />
+    <field id="duration"    type="integer" onChange="onDataChanged" />
+    <field id="isLive"      type="boolean" value="false" onChange="onDataChanged" />
+    <field id="playState"   type="string"  onChange="onDataChanged" />
+  </interface>
+  <children>
+    <!-- full-screen background -->
+    <Rectangle id="bg"       width="1920" height="1080" translation="[0,0]"   color="0x0D0E10FF" />
+    <Rectangle id="headerBg" width="1920" height="120"  translation="[0,0]"   color="0x1E2124FF" />
+    <Label id="headerLabel"
+           text="NOW PLAYING"
+           translation="[80, 60]"
+           font="font:MediumBoldSystemFont"
+           vertAlign="center"
+           color="0x9C9FA4FF" />
+
+    <!-- artwork -->
+    <Poster id="artwork"
+            width="480" height="480"
+            translation="[80, 180]"
+            loadDisplayMode="scaleToFit" />
+
+    <!-- title + podcast -->
+    <Label id="title"
+           translation="[640, 180]"
+           width="1220" height="120"
+           font="font:LargeBoldSystemFont"
+           color="0xFFFFFFFF"
+           wrap="true" />
+    <Label id="podcast"
+           translation="[640, 330]"
+           width="1220"
+           font="font:MediumSystemFont"
+           color="0x9C9FA4FF" />
+
+    <!-- LIVE badge (radio only) -->
+    <Label id="liveLabel"
+           translation="[640, 430]"
+           text="* LIVE"
+           font="font:MediumBoldSystemFont"
+           color="0xFF4444FF"
+           visible="false" />
+
+    <!-- progress bar (podcasts only) -->
+    <Rectangle id="progressBg"
+               translation="[640, 430]"
+               width="1220" height="8"
+               color="0x3A3D42FF" />
+    <Rectangle id="progressFill"
+               translation="[640, 430]"
+               width="0" height="8"
+               color="0x00A0E8FF" />
+    <Label id="timeLabel"
+           translation="[640, 452]"
+           width="1220"
+           font="font:SmallSystemFont"
+           color="0x9C9FA4FF" />
+    <Label id="skipHint"
+           translation="[640, 510]"
+           width="1220"
+           font="font:SmallSystemFont"
+           color="0x666A72FF" />
+
+    <!-- bottom hint -->
+    <Label id="bottomHint"
+           translation="[80, 1020]"
+           width="1760"
+           font="font:SmallSystemFont"
+           color="0x4A4D54FF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/NowPlaying.brs" />
+</component>

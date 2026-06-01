@@ -2,20 +2,34 @@
 <component name="MainScene" extends="Scene">
   <interface />
   <children>
+    <!-- Scene background -->
+    <Rectangle id="bg"
+               width="1920" height="1080"
+               translation="[0, 0]"
+               color="0x1A1B1DFF" />
+    <!-- Header bar -->
+    <Rectangle id="headerBg"
+               width="1920" height="120"
+               translation="[0, 0]"
+               color="0x303337FF" />
     <Label id="title"
-           text="PocketStreams — M2"
-           translation="[80, 80]"
+           text="PocketStreams"
+           translation="[80, 60]"
            width="1760"
            font="font:LargeBoldSystemFont"
+           vertAlign="center"
            color="0xFFFFFFFF" />
     <Label id="status"
            text="Loading..."
-           translation="[80, 180]"
+           translation="[80, 960]"
            width="1760"
-           height="800"
-           wrap="true"
+           height="60"
            font="font:MediumSystemFont"
-           color="0xCCDDEEFF" />
+           color="0x9C9FA4FF"
+           truncateOnDelimiter="true" />
+    <UpNextList id="upNextList" visible="false" />
+    <StationList id="stationList" visible="false" />
+    <NowPlaying id="nowPlaying" visible="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
   <script type="text/brightscript" uri="pkg:/source/registry.brs" />

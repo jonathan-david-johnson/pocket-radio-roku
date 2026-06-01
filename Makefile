@@ -10,7 +10,7 @@ ZIP        = channel.zip
 # Channel sources zipped at the root (no wrapping folder), if present.
 SRC        = manifest source components images
 
-.PHONY: help build zip install sideload deploy telnet debug screenshot clean
+.PHONY: help build zip install sideload deploy telnet debug killtelnet screenshot clean
 .DEFAULT_GOAL := help
 
 help:
@@ -52,6 +52,14 @@ deploy: build install
 telnet debug:
 	@echo "Connecting to $(ROKU_HOST):8085 (Ctrl-] then 'quit' to exit)"
 	@telnet $(ROKU_HOST) 8085
+
+# Kill any local telnet/nc clients holding the device console (port 8085).
+# The Roku allows only one console connection; a stale client blocks reconnect.
+killtelnet:
+	@pkill -f "telnet $(ROKU_HOST) 8085" 2>/dev/null; \
+	pkill -f "nc $(ROKU_HOST) 8085" 2>/dev/null; \
+	pkill -f "nc -w[0-9]* $(ROKU_HOST) 8085" 2>/dev/null; \
+	echo "Killed any local telnet/nc clients to $(ROKU_HOST):8085"
 
 # Pull a screenshot from the dev device.
 screenshot:

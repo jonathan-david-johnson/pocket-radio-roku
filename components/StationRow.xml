@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="StationRow" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContentSet" />
+    <field id="focusPercent" type="float" onChange="onFocus" />
+  </interface>
+  <children>
+    <Rectangle id="bg" width="1760" height="80" color="0x292B2EFF" />
+    <Label id="name"
+           translation="[20, 20]"
+           width="1680" height="40"
+           font="font:LargeSystemFont"
+           color="0xFFFFFFFF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/StationRow.brs" />
+</component>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="StationList" extends="Group">
+  <interface>
+    <field id="itemSelected" type="int" alwaysNotify="true" />
+    <field id="itemFocused" type="int" />
+  </interface>
+  <children>
+    <MarkupList id="list"
+                translation="[80, 200]"
+                itemSize="[1760, 80]"
+                itemComponentName="StationRow" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/StationList.brs" />
+</component>
