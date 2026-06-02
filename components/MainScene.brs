@@ -18,11 +18,22 @@ Sub init()
     ' Map m.status -> gridStatus so legacy status calls still work
     m.status = m.gridStatus
 
+    m.backdropFade = m.top.findNode("backdropFade")
+
+    m.focusTimer = CreateObject("roSGNode", "Timer")
+    m.focusTimer.duration = 0.15
+    m.focusTimer.repeat = false
+    m.focusTimer.observeField("fire", "onFocusTimer")
+
     m.tileGrid.observeField("itemFocused",  "onTileFocused")
     m.tileGrid.observeField("itemSelected", "onTileSelected")
 
-    m.mode     = "boot"
-    m.navIndex = 0
+    m.nowPlaying = m.top.findNode("nowPlaying")
+
+    m.mode       = "boot"
+    m.navIndex   = 0
+    m.gridIdx    = 0
+    m.numColumns = 6
     m.top.setFocus(true)
 
     ' Device ID
@@ -183,12 +194,21 @@ End Sub
 
 Sub enterGrid()
     m.mode = "grid"
-    m.tileGrid.setFocus(true)
+    m.gridIdx = 0
+    m.top.setFocus(true)
     updateKeyHints()
 End Sub
 
 Sub enterNav()
     m.mode = "nav"
+    m.top.setFocus(true)
+    updateKeyHints()
+End Sub
+
+Sub enterNowPlaying()
+    m.mode = "nowplaying"
+    m.nowPlaying.visible = true
+    m.keyHints.visible = false
     m.top.setFocus(true)
     updateKeyHints()
 End Sub
@@ -211,13 +231,15 @@ End Sub
 
 Sub updateKeyHints()
     if m.mode = "nav"
-        m.keyHints.text = "Left/Right  Switch tab   Down/OK  Enter grid   Back  Logout"
-    else if m.mode = "grid"
-        if m.navIndex = 2 or m.navIndex = 3
-            m.keyHints.text = "OK  Play   Right  Station detail   Up  Tabs"
+        if m.nowPlayingActive
+            m.keyHints.text = "Left/Right  Switch tab   Down  Grid   Up  Now Playing   Back  Logout"
         else
-            m.keyHints.text = "OK  Play   Right  Episode detail   Up  Tabs"
+            m.keyHints.text = "Left/Right  Switch tab   Down/OK  Enter grid   Back  Logout"
         end if
+    else if m.mode = "grid"
+        m.keyHints.text = "OK  Play   Left/Right  Move   Up/Back  Nav bar"
+    else if m.mode = "nowplaying"
+        m.keyHints.text = "Play  Play/Pause   Left/Right  Skip   Back  Return"
     end if
 End Sub
 
@@ -274,6 +296,7 @@ Sub onUpNextLoaded()
             duration:    ep.duration,
             isStation:   false
         })
+        child.isNowPlaying = false
     end for
     m.tileGrid.content = content
     m.tileGrid.jumpToItem = 0
@@ -317,6 +340,7 @@ Sub onNewReleasesLoaded()
             duration:    ep.duration,
             isStation:   false
         })
+        child.isNowPlaying = false
     end for
     m.tileGrid.content = content
     m.tileGrid.jumpToItem = 0
@@ -426,6 +450,8 @@ Sub showStationGrid(stations as object)
         child.url   = station.url_resolved
         if station.favicon <> invalid and station.favicon <> ""
             child.HDPosterUrl = station.favicon
+        else
+            child.HDPosterUrl = StationArtwork(station.name)
         end if
         meta = {
             stationuuid: station.stationuuid,
@@ -436,6 +462,7 @@ Sub showStationGrid(stations as object)
         if station.bitrate <> invalid then meta.bitrate = station.bitrate
         if station.country <> invalid then meta.display = station.country
         child.description = FormatJSON(meta)
+        child.isNowPlaying = false
     end for
     m.tileGrid.content = content
     m.tileGrid.jumpToItem = 0
@@ -447,6 +474,7 @@ End Sub
 
 Sub onTileFocused()
     idx = m.tileGrid.itemFocused
+    m.gridIdx = idx
     print "[MainScene] tileFocused="; idx
     if m.tileGrid.content = invalid then return
     item = m.tileGrid.content.getChild(idx)
@@ -454,12 +482,30 @@ Sub onTileFocused()
     updateTopPanelMeta(item)
 End Sub
 
+Sub onFocusTimer()
+    if m.pendingBackdropUrl = invalid or m.pendingBackdropUrl = "" then return
+    m.backdrop.opacity = 0.0
+    m.backdrop.uri = m.pendingBackdropUrl
+    m.backdropFade.control = "start"
+End Sub
+
+Sub setNowBadge(idx as integer)
+    if m.tileGrid.content = invalid then return
+    count = m.tileGrid.content.getChildCount()
+    for i = 0 to count - 1
+        child = m.tileGrid.content.getChild(i)
+        if child <> invalid then child.isNowPlaying = (i = idx)
+    end for
+End Sub
+
 Sub updateTopPanelMeta(item as object)
+    if m.nowPlayingActive = true then return
     m.topTitle.text  = item.title
     artUrl = item.HDPosterUrl
     if artUrl <> invalid and artUrl <> ""
         m.topArt.uri = artUrl
-        m.backdrop.uri = artUrl
+        m.pendingBackdropUrl = artUrl
+        m.focusTimer.control = "start"
     end if
     meta = ParseJSON(item.description)
     if meta = invalid then return
@@ -494,6 +540,10 @@ End Sub
 
 Sub onTileSelected()
     idx = m.tileGrid.itemSelected
+    selectGridItem(idx)
+End Sub
+
+Sub selectGridItem(idx as integer)
     print "[MainScene] tileSelected="; idx
     if m.tileGrid.content = invalid then return
     item = m.tileGrid.content.getChild(idx)
@@ -526,6 +576,18 @@ Sub onTileSelected()
     end if
 End Sub
 
+Sub focusGridItem(idx as integer)
+    if m.tileGrid.content = invalid then return
+    count = m.tileGrid.content.getChildCount()
+    if count = 0 then return
+    if idx < 0 then idx = 0
+    if idx >= count then idx = count - 1
+    m.gridIdx = idx
+    m.tileGrid.jumpToItem = idx
+    item = m.tileGrid.content.getChild(idx)
+    if item <> invalid then updateTopPanelMeta(item)
+End Sub
+
 Sub onPlayNowDone()
     print "[MainScene] playNow done status="; m.changeTask.status
     if m.pendingPlayItem <> invalid
@@ -549,6 +611,7 @@ Sub playStation(item as object, meta as object)
     audioContent.url = item.url
     audioContent.streamformat = fmt
 
+    m.audio.content = invalid
     m.audio.content = audioContent
     m.audio.control = "play"
 
@@ -557,10 +620,31 @@ Sub playStation(item as object, meta as object)
     m.currentEpisode   = invalid
     m.currentStation   = item
     m.nowPlayingActive = true
+    setNowBadge(m.gridIdx)
 
     showPlayingState(item.title, "", item.HDPosterUrl, isLive)
     stopTracklist()
     startTracklist(item.title)
+
+    m.nowPlaying.trackTitle  = item.title
+    m.nowPlaying.podcastName = ""
+    m.nowPlaying.artworkUrl  = item.HDPosterUrl
+    m.nowPlaying.isLive      = isLive
+    m.nowPlaying.duration    = 0
+    m.nowPlaying.skipBack    = m.skipBack
+    m.nowPlaying.skipFwd     = m.skipFwd
+    m.nowPlaying.playState   = "playing"
+
+    parts = []
+    if meta.display <> invalid and meta.display <> "" then parts.push(meta.display)
+    if meta.codec <> invalid and meta.codec <> ""
+        codecStr = meta.codec
+        if meta.bitrate <> invalid and meta.bitrate > 0
+            codecStr = codecStr + " / " + meta.bitrate.ToStr() + " kbps"
+        end if
+        parts.push(codecStr)
+    end if
+    m.nowPlaying.description = parts.Join("  |  ")
 End Sub
 
 Sub playEpisode(item as object)
@@ -582,12 +666,14 @@ Sub playEpisode(item as object)
     print "[MainScene] playEpisode playStart="; playStart; " duration="; meta.duration
     if playStart > 0 then audioContent.PlayStart = playStart
 
+    m.audio.content = invalid
     m.audio.content = audioContent
     m.audio.control = "play"
 
     m.isCurrentlyLive  = false
     m.currentStation   = invalid
     m.nowPlayingActive = true
+    setNowBadge(m.gridIdx)
     stopTracklist()
 
     podcastName = ""
@@ -603,6 +689,28 @@ Sub playEpisode(item as object)
     }
 
     showPlayingState(item.title, podcastName, artUrl, false)
+
+    m.nowPlaying.trackTitle  = item.title
+    m.nowPlaying.podcastName = podcastName
+    m.nowPlaying.artworkUrl  = artUrl
+    m.nowPlaying.isLive      = false
+    m.nowPlaying.duration    = meta.duration
+    m.nowPlaying.skipBack    = m.skipBack
+    m.nowPlaying.skipFwd     = m.skipFwd
+    m.nowPlaying.playState   = "playing"
+
+    dur = CInt(meta.duration)
+    played = CInt(meta.playedUpTo)
+    descParts = []
+    if dur > 0
+        if played > 0
+            left = dur - played
+            descParts.push(FmtDur(left) + " left")
+        else
+            descParts.push(FmtDur(dur))
+        end if
+    end if
+    m.nowPlaying.description = podcastName + "  |  " + descParts.Join("  ")
 
     m.lastSavedPosition = playStart
     if m.saveTimer = invalid
@@ -623,6 +731,12 @@ Sub playEpisode(item as object)
 End Sub
 
 Sub showPlayingState(title as string, subtitle as string, artUrl as string, isLive as boolean)
+    m.topTitle.text    = title
+    m.topSubtitle.text = subtitle
+    if artUrl <> invalid and artUrl <> ""
+        m.topArt.uri   = artUrl
+        m.backdrop.uri = artUrl
+    end if
     m.progressBg.visible   = not isLive
     m.progressFill.visible = not isLive
     m.timeLabel.visible    = not isLive
@@ -654,6 +768,8 @@ Sub onPosTimer()
             m.timeLabel.text = FmtDurHMS(CInt(curPos)) + "  /  " + FmtDurHMS(dur) + "  (" + FmtDur(left) + " left)"
         end if
     end if
+    m.nowPlaying.playPos   = CInt(curPos)
+    m.nowPlaying.playState = m.audio.state
 End Sub
 
 Sub saveEpisodePosition(position, status)
@@ -723,10 +839,13 @@ Sub advanceQueue()
         if content.getChildCount() <= 1
             setStatus("Queue finished.")
             m.nowPlayingActive = false
+            setNowBadge(-1)
             m.progressBg.visible   = false
             m.progressFill.visible = false
             m.timeLabel.visible    = false
             m.controlsHint.visible = false
+            m.nowPlaying.visible   = false
+            if m.mode = "nowplaying" then enterNav()
             return
         end if
         content.removeChildIndex(0)
@@ -740,6 +859,7 @@ End Sub
 
 Sub onAudioState()
     if m.audio = invalid then return
+    m.nowPlaying.playState = m.audio.state
 
     if m.audio.state = "finished"
         if m.currentEpisode <> invalid
@@ -749,6 +869,7 @@ Sub onAudioState()
         else if m.currentStation <> invalid
             setStatus("Stream ended.")
             m.nowPlayingActive = false
+            setNowBadge(-1)
         end if
     else if m.audio.state = "paused" or m.audio.state = "stopped"
         if m.currentEpisode <> invalid
@@ -765,12 +886,15 @@ Sub onAudioState()
         if m.saveTimer <> invalid then m.saveTimer.control = "stop"
         if m.posTimer  <> invalid then m.posTimer.control  = "stop"
         m.nowPlayingActive     = false
+        setNowBadge(-1)
+        m.nowPlaying.visible   = false
         m.progressBg.visible   = false
         m.progressFill.visible = false
         m.timeLabel.visible    = false
         m.controlsHint.visible = false
         setStatus("Playback error. Check network.")
         print "[MainScene] audio error"
+        if m.mode = "nowplaying" then enterNav()
     end if
 End Sub
 
@@ -944,6 +1068,16 @@ Function StripHtml(txt as string) as string
     return result.Trim()
 End Function
 
+Function StationArtwork(name as string) as string
+    n = LCase(name)
+    if n.Instr(0, "kcrw") >= 0
+        return "https://upload.wikimedia.org/wikipedia/en/thumb/6/6c/KCRW_logo.svg/300px-KCRW_logo.svg.png"
+    else if n.Instr(0, "kexp") >= 0
+        return "https://upload.wikimedia.org/wikipedia/en/thumb/8/8c/KEXP_logo.svg/300px-KEXP_logo.svg.png"
+    end if
+    return ""
+End Function
+
 Sub setStatus(text as string)
     m.gridStatus.text    = text
     m.gridStatus.visible = (text <> "")
@@ -957,6 +1091,7 @@ Sub logout()
     if m.posTimer  <> invalid then m.posTimer.control  = "stop"
     stopTracklist()
     m.nowPlayingActive     = false
+    m.nowPlaying.visible   = false
     m.progressBg.visible   = false
     m.progressFill.visible = false
     m.timeLabel.visible    = false
@@ -990,14 +1125,59 @@ Function onKeyEvent(key as string, press as boolean) as boolean
             showSection(m.navIndex)
             enterGrid()
             return true
+        else if key = "up"
+            if m.nowPlayingActive
+                enterNowPlaying()
+            end if
+            return true
+        else if key = "rewind" or key = "fastforward"
+            if m.nowPlayingActive and m.audio <> invalid and not m.isCurrentlyLive
+                curPos = m.audio.getField("position")
+                if key = "rewind"
+                    seekPos = curPos - m.skipBack
+                    if seekPos < 0 then seekPos = 0
+                    m.audio.seek = seekPos
+                else
+                    m.audio.seek = curPos + m.skipFwd
+                end if
+            end if
+            return true
         else if key = "back"
             showLogoutDialog()
             return true
         end if
 
     else if m.mode = "grid"
+        count = 0
+        if m.tileGrid.content <> invalid then count = m.tileGrid.content.getChildCount()
+
         if key = "back" or key = "up"
-            enterNav()
+            row = m.gridIdx \ m.numColumns
+            if row > 0 and count > 0
+                focusGridItem(m.gridIdx - m.numColumns)
+            else
+                print "[MainScene] grid back/up -> enterNav"
+                enterNav()
+            end if
+            return true
+        else if key = "down"
+            if count > 0
+                newIdx = m.gridIdx + m.numColumns
+                if newIdx < count then focusGridItem(newIdx)
+            end if
+            return true
+        else if key = "left"
+            if m.gridIdx > 0
+                focusGridItem(m.gridIdx - 1)
+            end if
+            return true
+        else if key = "right"
+            if count > 0 and m.gridIdx < count - 1
+                focusGridItem(m.gridIdx + 1)
+            end if
+            return true
+        else if key = "OK"
+            if count > 0 then selectGridItem(m.gridIdx)
             return true
         else if key = "play"
             if m.audio <> invalid
@@ -1018,6 +1198,35 @@ Function onKeyEvent(key as string, press as boolean) as boolean
                 else
                     m.audio.seek = curPos + m.skipFwd
                 end if
+            end if
+            return true
+        end if
+
+    else if m.mode = "nowplaying"
+        if key = "back"
+            m.nowPlaying.visible = false
+            m.keyHints.visible = true
+            enterNav()
+            return true
+        else if key = "play" or key = "OK"
+            if m.audio <> invalid
+                if m.audio.state = "playing"
+                    m.audio.control = "pause"
+                else
+                    m.audio.control = "resume"
+                end if
+            end if
+            return true
+        else if key = "left" or key = "rewind"
+            if m.audio <> invalid and not m.isCurrentlyLive
+                seekPos = m.audio.getField("position") - m.skipBack
+                if seekPos < 0 then seekPos = 0
+                m.audio.seek = seekPos
+            end if
+            return true
+        else if key = "right" or key = "fastforward"
+            if m.audio <> invalid and not m.isCurrentlyLive
+                m.audio.seek = m.audio.getField("position") + m.skipFwd
             end if
             return true
         end if

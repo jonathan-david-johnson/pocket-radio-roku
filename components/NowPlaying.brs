@@ -7,6 +7,7 @@ Sub init()
     m.progressFill = m.top.findNode("progressFill")
     m.timeLabel    = m.top.findNode("timeLabel")
     m.skipHint     = m.top.findNode("skipHint")
+    m.descLabel    = m.top.findNode("descLabel")
     m.bottomHint   = m.top.findNode("bottomHint")
 End Sub
 
@@ -22,6 +23,7 @@ End Sub
 Sub onDataChanged()
     m.title.text   = m.top.trackTitle
     m.podcast.text = m.top.podcastName
+    if m.descLabel <> invalid then m.descLabel.text = m.top.description
 
     isLive = m.top.isLive
     posVal = CInt(m.top.playPos)

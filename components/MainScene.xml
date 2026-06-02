@@ -7,8 +7,12 @@
 
     <!-- Backdrop: artwork full-bleed at low opacity behind top panel -->
     <Poster id="backdrop" width="1920" height="390" translation="[0,0]"
-            loadDisplayMode="scaleToZoom" opacity="0.2" />
-    <Rectangle id="scrim" width="1920" height="390" translation="[0,0]" color="0x000000CC" />
+            loadDisplayMode="scaleToZoom" opacity="0.0" />
+    <Animation id="backdropFade" duration="0.3" easeFunction="inOutQuad" repeat="false">
+      <FloatFieldInterpolator fieldToInterp="backdrop.opacity"
+                              keyValue="[0.0, 0.2]" key="[0.0, 1.0]" />
+    </Animation>
+    <Rectangle id="scrim" width="1920" height="390" translation="[0,0]" color="0x000000AA" />
 
     <!-- Top panel: left = artwork, right = metadata -->
     <Poster id="topArt" width="200" height="200" translation="[80,50]"
@@ -25,61 +29,65 @@
            wrap="true" />
 
     <!-- Progress bar (hidden until playback starts) -->
-    <Rectangle id="progressBg"   translation="[80,278]" width="1760" height="8"
+    <Rectangle id="progressBg"   translation="[80,250]" width="1760" height="8"
                color="0x3A3D42FF" visible="false" />
-    <Rectangle id="progressFill" translation="[80,278]" width="0"    height="8"
+    <Rectangle id="progressFill" translation="[80,250]" width="0"    height="8"
                color="0x00A0E8FF" visible="false" />
     <Label id="timeLabel"
-           translation="[80,292]" width="1760"
+           translation="[80,264]" width="1760"
            font="font:SmallSystemFont" color="0x9C9FA4FF"
            visible="false" />
     <Label id="controlsHint"
-           translation="[80,340]" width="1760"
+           translation="[80,288]" width="1760"
            font="font:SmallSystemFont" color="0x4A4D54FF"
            visible="false" />
 
     <!-- Nav bar -->
-    <Rectangle id="navBg" width="1920" height="60" translation="[0,390]"
+    <Rectangle id="navBg" width="1920" height="60" translation="[0,370]"
                color="0x1E2124FF" />
     <!-- Tab 0: Up Next -->
-    <Label id="tab0" translation="[80,390]" width="240" height="60"
+    <Label id="tab0" translation="[80,370]" width="240" height="60"
            font="font:MediumSystemFont" color="0x9C9FA4FF"
            vertAlign="center" text="Up Next" />
-    <Rectangle id="tab0line" translation="[80,447]" width="240" height="3"
+    <Rectangle id="tab0line" translation="[80,427]" width="240" height="3"
                color="0x00A0E8FF" visible="false" />
     <!-- Tab 1: New Releases -->
-    <Label id="tab1" translation="[360,390]" width="240" height="60"
+    <Label id="tab1" translation="[360,370]" width="240" height="60"
            font="font:MediumSystemFont" color="0x9C9FA4FF"
            vertAlign="center" text="New Releases" />
-    <Rectangle id="tab1line" translation="[360,447]" width="240" height="3"
+    <Rectangle id="tab1line" translation="[360,427]" width="240" height="3"
                color="0x00A0E8FF" visible="false" />
     <!-- Tab 2: Radio Favs -->
-    <Label id="tab2" translation="[640,390]" width="240" height="60"
+    <Label id="tab2" translation="[640,370]" width="240" height="60"
            font="font:MediumSystemFont" color="0x9C9FA4FF"
            vertAlign="center" text="Radio Favs" />
-    <Rectangle id="tab2line" translation="[640,447]" width="240" height="3"
+    <Rectangle id="tab2line" translation="[640,427]" width="240" height="3"
                color="0x00A0E8FF" visible="false" />
     <!-- Tab 3: Browse -->
-    <Label id="tab3" translation="[920,390]" width="240" height="60"
+    <Label id="tab3" translation="[920,370]" width="240" height="60"
            font="font:MediumSystemFont" color="0x9C9FA4FF"
            vertAlign="center" text="Browse" />
-    <Rectangle id="tab3line" translation="[920,447]" width="240" height="3"
+    <Rectangle id="tab3line" translation="[920,427]" width="240" height="3"
                color="0x00A0E8FF" visible="false" />
 
     <!-- Tile grid -->
     <MarkupGrid id="tileGrid"
-                translation="[80,470]"
+                translation="[80,450]"
                 itemSize="[270,200]"
                 itemSpacing="[20,20]"
                 numColumns="6"
+                numRows="2"
                 itemComponentName="TileItem"
                 drawFocusFeedback="false" />
 
     <!-- Grid status (loading / empty / error) -->
     <Label id="gridStatus"
-           translation="[80,600]" width="1760" height="60"
+           translation="[80,590]" width="1760" height="60"
            font="font:MediumSystemFont" color="0x9C9FA4FF"
            horizAlign="center" visible="false" />
+
+    <!-- Now Playing overlay -->
+    <NowPlaying id="nowPlaying" visible="false" />
 
     <!-- Key hints -->
     <Label id="keyHints"
