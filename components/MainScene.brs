@@ -30,9 +30,12 @@ Sub init()
 
     m.nowPlaying = m.top.findNode("nowPlaying")
 
-    m.mode       = "boot"
-    m.navIndex   = 0
-    m.gridIdx    = 0
+    m.mode             = "boot"
+    m.navIndex         = 0
+    m.gridIdx          = 0
+    m.nowPlayingActive = false
+    m.isCurrentlyLive  = false
+    m.pendingBackdropUrl = ""
     m.numColumns = 6
     m.top.setFocus(true)
 
@@ -300,7 +303,10 @@ Sub onUpNextLoaded()
     end for
     m.tileGrid.content = content
     m.tileGrid.jumpToItem = 0
+    m.gridIdx = 0
     setStatus("")
+    firstItem = content.getChild(0)
+    if firstItem <> invalid then updateTopPanelMeta(firstItem)
     print "[MainScene] Up Next loaded count="; data.episodes.count()
 End Sub
 
@@ -344,7 +350,10 @@ Sub onNewReleasesLoaded()
     end for
     m.tileGrid.content = content
     m.tileGrid.jumpToItem = 0
+    m.gridIdx = 0
     setStatus("")
+    firstItem = content.getChild(0)
+    if firstItem <> invalid then updateTopPanelMeta(firstItem)
     print "[MainScene] New Releases loaded count="; data.episodes.count()
 End Sub
 
@@ -448,11 +457,14 @@ Sub showStationGrid(stations as object)
         child = content.createChild("ContentNode")
         child.title = station.name
         child.url   = station.url_resolved
-        if station.favicon <> invalid and station.favicon <> ""
-            child.HDPosterUrl = station.favicon
-        else
-            child.HDPosterUrl = StationArtwork(station.name)
+        artwork = StationArtwork(station.name)
+        if artwork = ""
+            favicon = station.favicon
+            if favicon <> invalid and favicon <> "" and favicon.Instr(0, ".ico") < 0 and favicon.Instr(0, ".svg") < 0
+                artwork = favicon
+            end if
         end if
+        child.HDPosterUrl = artwork
         meta = {
             stationuuid: station.stationuuid,
             isStation:   true,
@@ -466,7 +478,10 @@ Sub showStationGrid(stations as object)
     end for
     m.tileGrid.content = content
     m.tileGrid.jumpToItem = 0
+    m.gridIdx = 0
     setStatus("")
+    firstItem = content.getChild(0)
+    if firstItem <> invalid then updateTopPanelMeta(firstItem)
     print "[MainScene] station grid count="; stations.count()
 End Sub
 
@@ -1071,9 +1086,9 @@ End Function
 Function StationArtwork(name as string) as string
     n = LCase(name)
     if n.Instr(0, "kcrw") >= 0
-        return "https://upload.wikimedia.org/wikipedia/en/thumb/6/6c/KCRW_logo.svg/300px-KCRW_logo.svg.png"
+        return "pkg:/images/kcrw_logo.png"
     else if n.Instr(0, "kexp") >= 0
-        return "https://upload.wikimedia.org/wikipedia/en/thumb/8/8c/KEXP_logo.svg/300px-KEXP_logo.svg.png"
+        return "pkg:/images/kexp_logo.png"
     end if
     return ""
 End Function

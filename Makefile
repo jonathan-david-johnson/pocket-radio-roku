@@ -10,7 +10,7 @@ ZIP        = channel.zip
 # Channel sources zipped at the root (no wrapping folder), if present.
 SRC        = manifest source components images
 
-.PHONY: help build zip install sideload deploy telnet debug killtelnet screenshot clean
+.PHONY: help build zip install sideload deploy dev telnet debug killtelnet screenshot clean
 .DEFAULT_GOAL := help
 
 help:
@@ -19,7 +19,8 @@ help:
 	@echo "  build / zip    Package present channel sources into $(ZIP)"
 	@echo "  install        Sideload $(ZIP) to the device (needs ROKU_PASS)"
 	@echo "  deploy         build + install"
-	@echo "  telnet/debug   Open BrightScript debug console (port 8085)"
+	@echo "  dev            build + install + open debug console (Ctrl-C to exit)"
+	@echo "  telnet/debug   Open debug console only (no rebuild, Ctrl-C to exit)"
 	@echo "  screenshot     Pull a device screenshot to screenshot.jpg"
 	@echo "  clean          Remove $(ZIP)"
 	@echo ""
@@ -48,10 +49,15 @@ install:
 sideload: install
 deploy: build install
 
-# BrightScript console: print output + crash backtraces.
+# Full dev loop: build, sideload, open debug console. Ctrl-C to exit nc.
+dev: build install
+	@echo "Connecting to $(ROKU_HOST):8085 (Ctrl-C to exit)"
+	@nc $(ROKU_HOST) 8085
+
+# BrightScript console only (no rebuild). Ctrl-C to exit.
 telnet debug:
-	@echo "Connecting to $(ROKU_HOST):8085 (Ctrl-] then 'quit' to exit)"
-	@telnet $(ROKU_HOST) 8085
+	@echo "Connecting to $(ROKU_HOST):8085 (Ctrl-C to exit)"
+	@nc $(ROKU_HOST) 8085
 
 # Kill any local telnet/nc clients holding the device console (port 8085).
 # The Roku allows only one console connection; a stale client blocks reconnect.
