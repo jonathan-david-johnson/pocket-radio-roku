@@ -86,6 +86,24 @@
            font="font:MediumSystemFont" color="0x9C9FA4FF"
            horizAlign="center" visible="false" />
 
+    <!-- Podcast detail panel (right half, podcast tabs only) -->
+    <Group id="podcastDetail" translation="[960, 450]" visible="false">
+      <Poster id="detailArt" width="180" height="180" translation="[40,20]"
+              loadDisplayMode="scaleToZoom" />
+      <Label id="detailDate" translation="[40,212]" width="800" height="24"
+             font="font:SmallSystemFont" color="0x00A0E8FF" />
+      <Label id="detailTitle" translation="[40,242]" width="800" height="72"
+             font="font:LargeBoldSystemFont" color="0xFFFFFFFF"
+             wrap="true" />
+      <Label id="detailPodcast" translation="[40,322]" width="800" height="24"
+             font="font:SmallSystemFont" color="0x9C9FA4FF" />
+      <Label id="detailTime" translation="[40,352]" width="800" height="24"
+             font="font:SmallSystemFont" color="0x9C9FA4FF" />
+      <Label id="detailDesc" translation="[40,392]" width="800" height="160"
+             font="font:SmallSystemFont" color="0x6A6D74FF"
+             wrap="true" />
+    </Group>
+
     <!-- Now Playing overlay -->
     <NowPlaying id="nowPlaying" visible="false" />
 

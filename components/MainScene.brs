@@ -18,7 +18,14 @@ Sub init()
     ' Map m.status -> gridStatus so legacy status calls still work
     m.status = m.gridStatus
 
-    m.backdropFade = m.top.findNode("backdropFade")
+    m.backdropFade   = m.top.findNode("backdropFade")
+    m.podcastDetail  = m.top.findNode("podcastDetail")
+    m.detailArt      = m.top.findNode("detailArt")
+    m.detailDate     = m.top.findNode("detailDate")
+    m.detailTitle    = m.top.findNode("detailTitle")
+    m.detailPodcast  = m.top.findNode("detailPodcast")
+    m.detailTime     = m.top.findNode("detailTime")
+    m.detailDesc     = m.top.findNode("detailDesc")
 
     m.focusTimer = CreateObject("roSGNode", "Timer")
     m.focusTimer.duration = 0.15
@@ -221,16 +228,99 @@ Sub showSection(index as integer)
     setNavTab(index)
     m.tileGrid.content = invalid
     setStatus("")
-    if index = 0
-        loadUpNext()
-    else if index = 1
-        loadNewReleases()
-    else if index = 2
-        loadFavorites()
-    else if index = 3
-        loadBrowse()
+    if index = 0 or index = 1
+        setPodcastGrid()
+        if index = 0 then loadUpNext() else loadNewReleases()
+    else
+        setStationGrid()
+        if index = 2 then loadFavorites() else loadBrowse()
     end if
 End Sub
+
+Sub setPodcastGrid()
+    m.tileGrid.itemComponentName = "PodcastTileItem"
+    m.tileGrid.itemSize          = [860, 90]
+    m.tileGrid.itemSpacing       = [20, 10]
+    m.tileGrid.numColumns        = 1
+    m.tileGrid.numRows           = 6
+    m.numColumns                 = 1
+    m.podcastDetail.visible      = true
+End Sub
+
+Sub setStationGrid()
+    m.tileGrid.itemComponentName = "TileItem"
+    m.tileGrid.itemSize          = [270, 200]
+    m.tileGrid.itemSpacing       = [20, 20]
+    m.tileGrid.numColumns        = 6
+    m.tileGrid.numRows           = 2
+    m.numColumns                 = 6
+    m.podcastDetail.visible      = false
+End Sub
+
+Sub updateDetailPanel(item as object)
+    if not m.podcastDetail.visible then return
+    if item = invalid then return
+    m.detailArt.uri = item.HDPosterUrl
+    m.detailTitle.text = item.title
+    meta = ParseJSON(item.description)
+    if meta = invalid then return
+    m.detailPodcast.text = meta.podcastName
+    m.detailDate.text    = meta.dateStr
+    dur    = CInt(meta.duration)
+    played = CInt(meta.playedUpTo)
+    if played > 0
+        left = dur - played
+        m.detailTime.text = PodFmtDetail(dur) + "  ·  " + PodFmtDetail(left) + " left"
+    else if dur > 0
+        m.detailTime.text = PodFmtDetail(dur)
+    else
+        m.detailTime.text = ""
+    end if
+    notes = meta.showNotes
+    if notes <> invalid and notes <> ""
+        ' Strip basic HTML tags for plain-text display
+        notes = notes.Replace("<p>", "").Replace("</p>", " ").Replace("<br>", " ").Replace("<br/>", " ").Replace("<br />", " ")
+        notes = notes.Replace("&amp;", "&").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&nbsp;", " ")
+        m.detailDesc.text = notes
+    else
+        m.detailDesc.text = ""
+    end if
+End Sub
+
+Function RelativeDate(isoStr as string) as string
+    if isoStr = invalid or isoStr = "" then return ""
+    pub = CreateObject("roDateTime")
+    pub.FromISO8601String(isoStr)
+    pubSecs = pub.AsSeconds()
+    now = CreateObject("roDateTime")
+    now.Mark()
+    nowSecs = now.AsSeconds()
+    diffSecs = nowSecs - pubSecs
+    if diffSecs < 0 then return ""
+    diffDays = int(diffSecs / 86400)
+    if diffDays = 0 then return "Today"
+    if diffDays = 1 then return "Yesterday"
+    days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+    if diffDays < 7
+        pub.Mark()
+        pub.FromISO8601String(isoStr)
+        return days[pub.GetDayOfWeek()]
+    end if
+    if diffDays < 14 then return "Last " + days[pub.GetDayOfWeek()]
+    weeks = int(diffDays / 7)
+    if weeks < 5 then return weeks.ToStr() + " weeks ago"
+    months = int(diffDays / 30)
+    if months = 1 then return "1 month ago"
+    return months.ToStr() + " months ago"
+End Function
+
+Function PodFmtDetail(secs as integer) as string
+    if secs <= 0 then return "0m"
+    h    = secs \ 3600
+    mins = (secs mod 3600) \ 60
+    if h > 0 then return h.ToStr() + "h " + mins.ToStr() + "m"
+    return mins.ToStr() + "m"
+End Function
 
 Sub updateKeyHints()
     if m.mode = "nav"
@@ -291,12 +381,17 @@ Sub onUpNextLoaded()
         child.title = ep.title
         child.url   = ep.url
         child.HDPosterUrl = "https://static.pocketcasts.com/discover/images/420/" + ep.podcast + ".jpg"
+        pubStr = ep.published
+        if type(pubStr) <> "String" then pubStr = ""
         child.description = FormatJSON({
             uuid:        ep.uuid,
             podcast:     ep.podcast,
             podcastName: ep.podcastName,
             playedUpTo:  ep.playedUpTo,
             duration:    ep.duration,
+            published:   pubStr,
+            dateStr:     RelativeDate(pubStr),
+            showNotes:   "",
             isStation:   false
         })
         child.isNowPlaying = false
@@ -306,7 +401,10 @@ Sub onUpNextLoaded()
     m.gridIdx = 0
     setStatus("")
     firstItem = content.getChild(0)
-    if firstItem <> invalid then updateTopPanelMeta(firstItem)
+    if firstItem <> invalid
+        updateTopPanelMeta(firstItem)
+        updateDetailPanel(firstItem)
+    end if
     print "[MainScene] Up Next loaded count="; data.episodes.count()
 End Sub
 
@@ -338,12 +436,19 @@ Sub onNewReleasesLoaded()
         child.title = ep.title
         child.url   = ep.url
         child.HDPosterUrl = ep.artworkUrl
+        pubStr = ep.published
+        if type(pubStr) <> "String" then pubStr = ""
+        notesStr = ep.showNotes
+        if type(notesStr) <> "String" then notesStr = ""
         child.description = FormatJSON({
             uuid:        ep.uuid,
             podcast:     ep.podcast,
             podcastName: ep.podcastName,
             playedUpTo:  0,
             duration:    ep.duration,
+            published:   pubStr,
+            dateStr:     RelativeDate(pubStr),
+            showNotes:   notesStr,
             isStation:   false
         })
         child.isNowPlaying = false
@@ -353,7 +458,10 @@ Sub onNewReleasesLoaded()
     m.gridIdx = 0
     setStatus("")
     firstItem = content.getChild(0)
-    if firstItem <> invalid then updateTopPanelMeta(firstItem)
+    if firstItem <> invalid
+        updateTopPanelMeta(firstItem)
+        updateDetailPanel(firstItem)
+    end if
     print "[MainScene] New Releases loaded count="; data.episodes.count()
 End Sub
 
@@ -481,7 +589,10 @@ Sub showStationGrid(stations as object)
     m.gridIdx = 0
     setStatus("")
     firstItem = content.getChild(0)
-    if firstItem <> invalid then updateTopPanelMeta(firstItem)
+    if firstItem <> invalid
+        updateTopPanelMeta(firstItem)
+        updateDetailPanel(firstItem)
+    end if
     print "[MainScene] station grid count="; stations.count()
 End Sub
 
@@ -495,6 +606,7 @@ Sub onTileFocused()
     item = m.tileGrid.content.getChild(idx)
     if item = invalid then return
     updateTopPanelMeta(item)
+    updateDetailPanel(item)
 End Sub
 
 Sub onFocusTimer()
@@ -514,7 +626,7 @@ Sub setNowBadge(idx as integer)
 End Sub
 
 Sub updateTopPanelMeta(item as object)
-    if m.nowPlayingActive = true then return
+    if not m.nowPlayingActive then return
     m.topTitle.text  = item.title
     artUrl = item.HDPosterUrl
     if artUrl <> invalid and artUrl <> ""
@@ -600,7 +712,10 @@ Sub focusGridItem(idx as integer)
     m.gridIdx = idx
     m.tileGrid.jumpToItem = idx
     item = m.tileGrid.content.getChild(idx)
-    if item <> invalid then updateTopPanelMeta(item)
+    if item <> invalid
+        updateTopPanelMeta(item)
+        updateDetailPanel(item)
+    end if
 End Sub
 
 Sub onPlayNowDone()
@@ -749,8 +864,10 @@ Sub showPlayingState(title as string, subtitle as string, artUrl as string, isLi
     m.topTitle.text    = title
     m.topSubtitle.text = subtitle
     if artUrl <> invalid and artUrl <> ""
-        m.topArt.uri   = artUrl
-        m.backdrop.uri = artUrl
+        m.topArt.uri       = artUrl
+        m.backdrop.opacity = 0.0
+        m.backdrop.uri     = artUrl
+        m.backdropFade.control = "start"
     end if
     m.progressBg.visible   = not isLive
     m.progressFill.visible = not isLive
@@ -888,7 +1005,14 @@ Sub onAudioState()
         end if
     else if m.audio.state = "paused" or m.audio.state = "stopped"
         if m.currentEpisode <> invalid
-            saveEpisodePosition(m.audio.position, 2)
+            curPos = m.audio.position
+            if curPos = invalid then curPos = 0
+            dur = m.currentEpisode.duration
+            if dur > 0 and (dur - CInt(curPos)) <= 10
+                finishAndAdvance(m.currentEpisode)
+            else
+                saveEpisodePosition(curPos, 2)
+            end if
         end if
         if m.saveTimer <> invalid then m.saveTimer.control = "stop"
         stopTracklist()
